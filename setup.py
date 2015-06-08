@@ -11,6 +11,7 @@ setup(
   author_email = "evan@whiskerlabs.com",
   license = "MIT",
   packages = find_packages(),
+  tests_require = ["pytest>=2.7.1"],
 
   # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
   classifiers = [
