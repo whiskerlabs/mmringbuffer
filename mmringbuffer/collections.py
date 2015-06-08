@@ -80,6 +80,13 @@ class MemMapRingBuffer(object):
 
 
   def __init__(self, file_path, capacity, item_size):
+    """
+    Parameters
+    ----------
+    file_path : path to a file to be memory-mapped for use in the buffer
+    capacity : maximum number of logical items to be stored in the buffer
+    item_size : size, in bytes, of each individual item to be stored in the buffer
+    """
     assert capacity > item_size
 
     self.capacity = capacity
