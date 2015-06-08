@@ -58,3 +58,13 @@ def test_wrap_overwrite():
     mmbuf.put(s)
   for s in words[4:8]:
     assert mmbuf.get() == s
+
+def test_read_load_data_from_file():
+  file_path = tempfile.mkstemp()[1]
+  mmbuf1 = MemMapRingBuffer(file_path, 1024, 7)
+  for s in ["vanilla", "tandoor", "sunsets"]:
+    mmbuf1.put(s)
+
+  mmbuf2 = MemMapRingBuffer(file_path, 1024, 7)
+  for s in ["vanilla", "tandoor", "sunsets"]:
+    assert mmbuf2.get() == s
