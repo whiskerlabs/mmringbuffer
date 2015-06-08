@@ -131,6 +131,16 @@ class MemMapRingBuffer(object):
     )
 
 
+  def size(self):
+    """Returns the number of allocated slots in the buffer."""
+    if self.empty():
+      return 0
+    elif self.write_position > self.read_position:
+      return (self.write_position - self.read_position) / self.item_size
+    else:
+      return ((self.capacity + self.item_size) - (self.read_position - self.write_position)) / self.item_size
+
+
   def put(self, item):
     """Put the bytes of the string `item` in the buffer."""
     assert type(item) is str

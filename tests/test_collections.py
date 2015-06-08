@@ -22,6 +22,28 @@ def test_get_on_empty_buffer_raises_indexerror():
   with pytest.raises(IndexError):
     mmbuf.get()
 
+def test_size():
+  mmbuf = MemMapRingBuffer(tempfile.mkstemp()[1], 16, 2)
+  # Add 8.
+  for i in range(0, 8):
+    assert mmbuf.size() == i
+    mmbuf.put("hi")
+
+  # Rm 4.
+  for i in range(7, 3, -1):
+    mmbuf.get()
+    assert mmbuf.size() == i
+
+  # Add 4.
+  for i in range(5, 9):
+    mmbuf.put("hi")
+    assert mmbuf.size() == i
+
+  # Rm 8.
+  for i in range(7, -1, -1):
+    mmbuf.get()
+    assert mmbuf.size() == i
+
 def test_get_a_stored_value():
   mmbuf = MemMapRingBuffer(tempfile.mkstemp()[1], 1024, 7)
   mmbuf.put("vanilla")
