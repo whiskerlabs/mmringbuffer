@@ -171,12 +171,17 @@ class MemMapRingBuffer(object):
         self.read_position = self.write_position + self.item_size
 
     self._record_rw_positions()
-    self.mmap_buffer.flush()
 
 
   def get(self):
     """Remove and return an item from the buffer. Throws `IndexError`
     if buffer is empty.
+
+    Note that because read and write positions are stored in the
+    header of the memory-mapped buffer, calling `get` represents a
+    mutation to the buffer's metadata. Thus, it is often advisable to
+    invoke `MemMapRingBuffer.flush()` manually after reading data from
+    the buffer.
     """
     if self.read_position + self.item_size > self.buffer_size:
       self.read_position = _HEADER_LEN
@@ -194,15 +199,18 @@ class MemMapRingBuffer(object):
       self.read_position = self.mmap_buffer.tell()
 
     self._record_rw_positions()
-    self.mmap_buffer.flush()
     return result
+
+
+  def flush(self):
+    """Flush changes made to the in-memory buffer back to disk."""
+    self.mmap_buffer.flush()
 
 
   def clear(self):
     """Remove all elements from the buffer."""
     self.mmap_buffer.seek(0)
     self.mmap_buffer.write("\0" * self.buffer_size)
-    self.mmap_buffer.flush()
     self.read_position = _HEADER_LEN
     self.write_position = _HEADER_LEN
     self._record_rw_positions()
