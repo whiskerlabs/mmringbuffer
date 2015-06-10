@@ -86,7 +86,7 @@ class MemMapRingBuffer(object):
     Parameters
     ----------
     file_path : path to a file to be memory-mapped for use in the buffer
-    capacity : maximum number of logical items to be stored in the buffer
+    capacity : total size, in bytes, of the data set stored in the buffer
     item_size : size, in bytes, of each individual item to be stored in the buffer
     """
     assert capacity > item_size
@@ -95,13 +95,18 @@ class MemMapRingBuffer(object):
     self.buffer_size = _HEADER_LEN + capacity + item_size
     self.item_size = item_size
 
-    # Open the file and pad its tail with zeros if it's not large
-    # enough to contain the buffer.
+    # Open the file and ensure that its length is equal to `self.buffer_size`.
     buffer_file = open(file_path, "a+b")
-    file_current_size = os.stat(file_path).st_size
-    if file_current_size < self.buffer_size:
+    buffer_file.truncate(self.buffer_size)
+
+    # This is probably unnecessary, but according to documentation [1],
+    # `file.truncate`'s behavior is platform-dependent.
+    #
+    # [1] https://docs.python.org/2/library/stdtypes.html#file.truncate
+    current_file_size = os.stat(file_path).st_size
+    if current_file_size != self.buffer_size:
       buffer_file.seek(file_current_size)
-      buffer_file.write("\0" * (self.buffer_size - file_current_size))
+      buffer_file.write("\0" * (self.buffer_size - current_file_size))
       buffer_file.flush()
 
     # Now mmap the file and check if it contains data. If so,
