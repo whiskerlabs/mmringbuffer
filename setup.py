@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 setup(
   name = "mmringbuffer",
-  version = "0.0.1.dev0",
+  version = "0.0.1",
   description = "A memory-mapped ring buffer implementation in Python.",
   url = "https://github.com/whiskerlabs/mmringbuffer",
   author = "Evan Meagher",
