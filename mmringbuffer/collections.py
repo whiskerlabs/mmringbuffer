@@ -1,4 +1,6 @@
-from .constants import _HEADER_LEN, _READ_POS_IDX, _WRITE_POS_IDX, _LEN_RECORD_FORMAT
+from .constants import (
+  _HEADER_LEN, _LEN_RECORD_FORMAT, _POS_VALUE_SIZE, _READ_POS_IDX, _WRITE_POS_IDX
+)
 import mmap
 import os
 import struct
@@ -6,21 +8,21 @@ import struct
 class MemMapRingBuffer(object):
   """A memory-mapped ring buffer.
 
-  A single slot in the ring buffer is always left unallocated in order
-  to ensure that the read and write positions are only ever equal when
-  the buffer is empty [1].
-
-  The underlying mmap buffer is prefixed with a header containing the
-  two integers representing the current read and write positions
+  The underlying mmap buffer is prefixed with a header containing two
+  64-bit integers representing the current read and write positions
   within the buffer. These positions are updated with each read and
   write in order to make buffer state fully reflected in the on-disk
   format.
+
+  A single logical slot in the ring buffer is always left unallocated
+  in order to ensure that the read and write positions are only ever
+  equal when the buffer is empty [1].
 
   Because of these two conditions, the actual size of the underlying
   memory-mapped buffer, in terms of the arguments to `__init__`, is
   equal to
 
-      4 + 4 + (item_size * (capacity + 1))
+      8 + 8 + (item_size * (capacity + 1))
 
   [1] http://en.wikipedia.org/wiki/Circular_buffer#Always_keep_one_slot_open
   """
@@ -38,7 +40,7 @@ class MemMapRingBuffer(object):
     self.mmap_buffer.seek(_READ_POS_IDX)
     recorded_read_position = struct.unpack(
       _LEN_RECORD_FORMAT,
-      self.mmap_buffer.read(4)
+      self.mmap_buffer.read(_POS_VALUE_SIZE)
     )[0]
     if recorded_read_position == 0:
       return _HEADER_LEN
@@ -59,7 +61,7 @@ class MemMapRingBuffer(object):
     self.mmap_buffer.seek(_WRITE_POS_IDX)
     recorded_write_position = struct.unpack(
       _LEN_RECORD_FORMAT,
-      self.mmap_buffer.read(4)
+      self.mmap_buffer.read(_POS_VALUE_SIZE)
     )[0]
     if recorded_write_position == 0:
       return _HEADER_LEN

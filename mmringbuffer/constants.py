@@ -1,7 +1,8 @@
 # Constant indices within mmap buffers.
-_READ_POS_IDX  = 0
-_WRITE_POS_IDX = 4
-_HEADER_LEN         = 8
+_POS_VALUE_SIZE = 8
+_READ_POS_IDX   = 0
+_WRITE_POS_IDX  = _POS_VALUE_SIZE
+_HEADER_LEN     = _POS_VALUE_SIZE * 2
 
 # struct.[un]pack format string for length fields
-_LEN_RECORD_FORMAT = "i"
+_LEN_RECORD_FORMAT = "q"

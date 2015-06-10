@@ -10,6 +10,26 @@ must persist across machine restarts.
 *NOTE:* This library is in alpha and thus all APIs and contracts are
 subject to change. Buyer beware, at least until v0.0.1 is released.
 
+## Buffer layout
+
+The underlying mmap buffer is prefixed with a header containing two
+64-bit integers representing the current read and write positions
+within the buffer. These positions are updated with each read and
+write in order to make buffer state fully reflected in the on-disk
+format.
+
+A single logical slot in the ring buffer is always left unallocated in
+order to ensure that the read and write positions are only ever equal
+when the buffer is empty [1].
+
+Because of these two conditions, the actual size of the underlying
+memory-mapped buffer, in terms of the arguments to `__init__`, is
+equal to
+
+    8 + 8 + (item_size * (capacity + 1))
+
+[1] http://en.wikipedia.org/wiki/Circular_buffer#Always_keep_one_slot_open
+
 ## Installation
 
 A 0.0.1 release of `mmringbuffer` hasn't been released, so the library
