@@ -7,7 +7,10 @@ memory-mapped variant of `collections.deque(maxlen)`. This combination
 of functionality comes in handy when one needs to buffer data that
 must persist across machine restarts.
 
-Latest stable version: mmringbuffer v0.0.1, released June 10, 2015
+Latest stable version:
+[mmringbuffer v0.0.1](https://pypi.python.org/pypi/mmringbuffer/0.0.1),
+released
+[June 10, 2015](https://github.com/whiskerlabs/mmringbuffer/releases/tag/0.0.1)
 
 ## Buffer layout
 
