@@ -1,17 +1,18 @@
-#!/usr/bin/env python
-
 from setuptools import setup, find_packages
+
+from mmringbuffer import __version__
 
 setup(
   name = "mmringbuffer",
-  version = "0.0.1",
-  description = "A memory-mapped ring buffer implementation in Python.",
+  version = __version__,
+  description = "A memory-mapped ring buffer in Python",
   url = "https://github.com/whiskerlabs/mmringbuffer",
   author = "Evan Meagher",
   author_email = "evan@whiskerlabs.com",
   license = "MIT",
   packages = find_packages(),
   tests_require = ["pytest>=2.7.1"],
+  zip_safe=True,
 
   # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
   classifiers = [

@@ -1,5 +1,6 @@
 from .constants import (
-  _HEADER_LEN, _LEN_RECORD_FORMAT, _POS_VALUE_SIZE, _READ_POS_IDX, _WRITE_POS_IDX
+  _HEADER_LEN, _ITEM_SIZE_FORMAT, _ITEM_SIZE_LEN, _POS_VALUE_FORMAT,
+  _POS_VALUE_LEN, _READ_POS_IDX, _WRITE_POS_IDX
 )
 import mmap
 import os
@@ -22,7 +23,7 @@ class MemMapRingBuffer(object):
   memory-mapped buffer, in terms of the arguments to `__init__`, is
   equal to
 
-      8 + 8 + (item_size * (capacity + 1))
+      8 + 8 + capacity + 1
 
   [1] http://en.wikipedia.org/wiki/Circular_buffer#Always_keep_one_slot_open
   """
@@ -39,8 +40,8 @@ class MemMapRingBuffer(object):
     """
     self.mmap_buffer.seek(_READ_POS_IDX)
     recorded_read_position = struct.unpack(
-      _LEN_RECORD_FORMAT,
-      self.mmap_buffer.read(_POS_VALUE_SIZE)
+      _POS_VALUE_FORMAT,
+      self.mmap_buffer.read(_POS_VALUE_LEN)
     )[0]
     if recorded_read_position == 0:
       return _HEADER_LEN
@@ -60,8 +61,8 @@ class MemMapRingBuffer(object):
     """
     self.mmap_buffer.seek(_WRITE_POS_IDX)
     recorded_write_position = struct.unpack(
-      _LEN_RECORD_FORMAT,
-      self.mmap_buffer.read(_POS_VALUE_SIZE)
+      _POS_VALUE_FORMAT,
+      self.mmap_buffer.read(_POS_VALUE_LEN)
     )[0]
     if recorded_write_position == 0:
       return _HEADER_LEN
@@ -73,27 +74,23 @@ class MemMapRingBuffer(object):
     """Record the current read and write positions to the buffer
     header.
     """
-    packed_read_position = struct.pack(_LEN_RECORD_FORMAT, self.read_position)
-    packed_write_position = struct.pack(_LEN_RECORD_FORMAT, self.write_position)
+    packed_read_position = struct.pack(_POS_VALUE_FORMAT, self.read_position)
+    packed_write_position = struct.pack(_POS_VALUE_FORMAT, self.write_position)
     self.mmap_buffer.seek(_READ_POS_IDX)
     self.mmap_buffer.write(packed_read_position)
     self.mmap_buffer.seek(_WRITE_POS_IDX)
     self.mmap_buffer.write(packed_write_position)
 
 
-  def __init__(self, file_path, capacity, item_size):
+  def __init__(self, file_path, capacity):
     """
     Parameters
     ----------
     file_path : path to a file to be memory-mapped for use in the buffer
     capacity : total size, in bytes, of the data set stored in the buffer
-    item_size : size, in bytes, of each individual item to be stored in the buffer
     """
-    assert capacity > item_size
-
     self.capacity = capacity
-    self.buffer_size = _HEADER_LEN + capacity + item_size
-    self.item_size = item_size
+    self.buffer_size = _HEADER_LEN + capacity + 1
 
     # Open the file and ensure that its length is equal to `self.buffer_size`.
     buffer_file = open(file_path, "a+b")
@@ -125,42 +122,58 @@ class MemMapRingBuffer(object):
     return self.read_position == self.write_position
 
 
-  def full(self):
-    """Return `True` if the buffer is full, `False` otherwise."""
-    # The buffer is full if the read position is directly ahead of the
-    # write position.
-    return (
-      self.write_position + 2*self.item_size > self.buffer_size and self.read_position == _HEADER_LEN
-    ) or (
-      self.write_position + self.item_size > self.buffer_size and self.read_position == _HEADER_LEN + self.item_size
-    ) or (
-      self.write_position + self.item_size == self.read_position
-    )
+  def _advance_read_position(self):
+    """Advances the reader position by one item."""
+    self.mmap_buffer.seek(self.read_position)
+    read_position_delta = struct.unpack(
+      _ITEM_SIZE_FORMAT,
+      self.mmap_buffer.read(_ITEM_SIZE_LEN)
+    )[0]
+    self.read_position += (_ITEM_SIZE_LEN + read_position_delta)
 
 
-  def size(self):
-    """Returns the number of allocated slots in the buffer."""
-    if self.empty():
-      return 0
-    elif self.write_position > self.read_position:
-      return (self.write_position - self.read_position) / self.item_size
-    else:
-      return ((self.capacity + self.item_size) - (self.read_position - self.write_position)) / self.item_size
+  def _reader_needs_advancing(self, n):
+    """Given the precondition that there is at least `n` bytes between
+    the write position and the end of the buffer, returns `True` if
+    there is enough space between the write and read positions to
+    allocate `n` bytes.
+    """
+    return self.read_position > self.write_position and (
+      self.read_position - self.write_position < _ITEM_SIZE_LEN + n)
 
 
   def put(self, item):
     """Put the bytes of the string `item` in the buffer."""
-    assert type(item) is str
-    assert len(item) == self.item_size
+    assert type(item) is str, "items put into ring buffer must be strings"
+    item_len = len(item)
+    assert _ITEM_SIZE_LEN + item_len <= self.capacity, "item size exceeds buffer capacity"
 
-    was_full = self.full()
-
-    # If there isn't enough remaining space at the tail of the buffer
-    # to fit another item, then wrap around.
-    if self.write_position + self.item_size > self.buffer_size:
+    # If there isn't enough space from the write position to the end
+    # of the buffer, then wrap around.
+    prev_write_position = self.write_position
+    was_empty = self.empty()
+    if self.write_position + _ITEM_SIZE_LEN + item_len + 1 > self.buffer_size:
       self.write_position = _HEADER_LEN
+      if was_empty:
+        # Buffer was empty, so reset read position to reflect emptiness.
+        self.read_position = _HEADER_LEN
+      elif self.read_position > prev_write_position:
+        # In wrapping around, the write position lapped the read
+        # position, so the latter must be advanced one past
+        # _HEADER_LEN.
+        self.read_position = _HEADER_LEN
+        self._advance_read_position()
 
+    # If the buffer wasn't empty and there isn't enough space between
+    # the write and read positions to fit the item, then advance the
+    # read position until it fits.
+    while not was_empty and self._reader_needs_advancing(item_len):
+      self._advance_read_position()
+
+    # Now that enough writer headroom has been ensured, it is safe to
+    # write the item.
     self.mmap_buffer.seek(self.write_position)
+    self.mmap_buffer.write(struct.pack(_ITEM_SIZE_FORMAT, item_len))
     self.mmap_buffer.write(item)
 
     # Update the write position.
@@ -169,20 +182,11 @@ class MemMapRingBuffer(object):
     else:
       self.write_position = self.mmap_buffer.tell()
 
-    # If the buffer was full prior to insertion, then the read
-    # position must be moved to the next item.
-    if was_full:
-      if self.write_position + self.item_size > self.buffer_size:
-        self.read_position = _HEADER_LEN + self.item_size
-      else:
-        self.read_position = self.write_position + self.item_size
-
     self._record_rw_positions()
 
 
   def get(self):
-    """Remove and return an item from the buffer. Throws `IndexError`
-    if buffer is empty.
+    """Remove and return the next item from the buffer.
 
     Note that because read and write positions are stored in the
     header of the memory-mapped buffer, calling `get` represents a
@@ -190,14 +194,15 @@ class MemMapRingBuffer(object):
     invoke `MemMapRingBuffer.flush()` manually after reading data from
     the buffer.
     """
-    if self.read_position + self.item_size > self.buffer_size:
-      self.read_position = _HEADER_LEN
-
     if self.empty():
-      raise IndexError("MemMapRingBuffer.get(): buffer is empty")
+      raise IndexError("buffer is empty")
 
     self.mmap_buffer.seek(self.read_position)
-    result = self.mmap_buffer.read(self.item_size)
+    item_len = struct.unpack(
+      _ITEM_SIZE_FORMAT,
+      self.mmap_buffer.read(_ITEM_SIZE_LEN)
+    )[0]
+    result = self.mmap_buffer.read(item_len)
 
     # Update the read position.
     if self.mmap_buffer.tell() == self.buffer_size:

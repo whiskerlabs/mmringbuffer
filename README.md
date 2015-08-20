@@ -1,6 +1,6 @@
 # Memory-Mapped Ring Buffer
 
-[![PyPI | mmringbuffer 0.0.1](http://img.shields.io/badge/PyPI-mmringbuffer_0.0.1-376A94.svg)](https://pypi.python.org/pypi/mmringbuffer)
+[![PyPI | mmringbuffer 0.0.2](http://img.shields.io/badge/PyPI-mmringbuffer_0.0.2-376A94.svg)](https://pypi.python.org/pypi/mmringbuffer)
 
 A memory-mapped ring buffer implementation in Python.
 
@@ -17,15 +17,20 @@ within the buffer. These positions are updated with each read and
 write in order to make buffer state fully reflected in the on-disk
 format.
 
-A single logical slot in the ring buffer is always left unallocated in
-order to ensure that the read and write positions are only ever equal
-when the buffer is empty [1].
+A single one-byte entry in the ring buffer is always left unallocated
+in order to ensure that the read and write positions are only ever
+equal when the buffer is empty [1].
 
 Because of these two conditions, the actual size of the underlying
-memory-mapped buffer, in terms of the arguments to `__init__`, is
-equal to
+memory-mapped buffer, in terms of the `capacity` constructor argument,
+is equal to
 
-    8 + 8 + (item_size * (capacity + 1))
+    8 + 8 + capacity + 1
+
+In order to allow non-uniform entry sizes, items stored in the buffer
+are prefixed by their size in bytes as a 32-bit integer. Keep this in
+mind when selecting a buffer capacity, as this capacity be large
+enough to handle one i32 per item.
 
 [1] http://en.wikipedia.org/wiki/Circular_buffer#Always_keep_one_slot_open
 
@@ -43,10 +48,9 @@ Install from source:
 
 ## Usage
 
-    # Create a 1MB ring buffer backed by a file under /var/spool to
-    # store seven-byte-long strings.
-    file_path = "/var/spool/mmrbexample"
-    mmbuf = MemMapRingBuffer(file_path, 1024 * 1024, 7)
+    # Create a 1MB ring buffer backed by a file under /var/spool.
+    file_path = "/var/spool/some_program/buffer"
+    mmbuf = MemMapRingBuffer(file_path, 1024 * 1024)
     mmbuf.put("vanilla")
     mmbuf.put("dogsled")
     assert mmbuf.get() == "vanilla"
