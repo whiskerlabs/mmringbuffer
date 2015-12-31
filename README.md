@@ -64,6 +64,6 @@ For any other inquiries, send mail to `software at whiskerlabs.com`.
 
 ## License
 
-Copyright 2015 Whisker Labs
+Copyright 2016 Whisker Labs
 
 Licensed under the MIT License. See LICENSE for details.
